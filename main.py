@@ -50,13 +50,12 @@ def health():
 
 
 # Prediction endpoint
+
 @app.post("/predict")
 def predict(passenger: PassengerInput):
-
-    # Convert the request into a dictionary
     data = passenger.model_dump()
 
-    # Validate and normalize Sex
+    # Convert text values to the same numeric encoding used during training
     data["Sex"] = data["Sex"].lower()
 
     if data["Sex"] not in ["male", "female"]:
@@ -65,7 +64,8 @@ def predict(passenger: PassengerInput):
             detail="Sex must be male or female"
         )
 
-    # Validate and normalize Embarked
+    data["Sex"] = {"male": 0, "female": 1}[data["Sex"]]
+
     if data["Embarked"] is not None:
         data["Embarked"] = data["Embarked"].upper()
 
@@ -74,6 +74,20 @@ def predict(passenger: PassengerInput):
                 status_code=422,
                 detail="Embarked must be S, C, Q, or null"
             )
+
+        data["Embarked"] = {"S": 0, "C": 1, "Q": 2}[data["Embarked"]]
+
+    input_df = pd.DataFrame([data])
+
+    prediction = int(model.predict(input_df)[0])
+
+    probability = float(model.predict_proba(input_df)[0][1])
+
+    return {
+        "survived": prediction,
+        "result": "Survived" if prediction == 1 else "Did not survive",
+        "survival_probability": round(probability, 4)
+    }
 
     # Convert input into a DataFrame
     input_df = pd.DataFrame([data])
